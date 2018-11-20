@@ -2,11 +2,10 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Plugin.BLE;
-using Plugin.BLE.Abstractions.Contracts;
-using Plugin.BLE.Abstractions.EventArgs;
+using standard_lib;
 using Xamarin.Forms;
 
 namespace BLETest
@@ -14,22 +13,19 @@ namespace BLETest
     public class MainPageViewModel : BindableBase
     {
         private readonly double _disappearingTime = 3;
-        private bool _isBtOn;
-        private readonly object _locker = new object();
-        private readonly IBluetoothLE _manager;
+        private bool _isBTEnabled;
 
         public MainPageViewModel()
         {
-            var manager = CrossBluetoothLE.Current;
-            if (!manager.IsAvailable)
+            if (!App.Bluetooth.CheckAvailability())
                 throw new Exception("BLE is not available.");
 
-            _manager = manager;
-            IsBTOn = _manager.IsOn;
-            if (IsBTOn)
+            IsPermissionsGranted = App.Bluetooth.CheckPermissions();
+            IsBTEnabled = App.Bluetooth.CheckState() == BleState.Enabled;
+            if (IsBTEnabled && IsPermissionsGranted)
                 StartScan();
-            _manager.Adapter.DeviceDiscovered += OnDeviceDiscovered;
-            _manager.StateChanged += OnStateChanged;
+            App.Bluetooth.DeviceDiscovered += OnDeviceDiscovered;
+            App.Bluetooth.StateChanged += OnStateChanged;
 
             Devices = new ObservableCollection<IDeviceInTest>();
             StartScanCommand = new Command(StartStacExecute);
@@ -40,10 +36,16 @@ namespace BLETest
 
         public ObservableCollection<IDeviceInTest> Devices { get; set; }
 
-        public bool IsBTOn
+        public bool IsBTEnabled
         {
-            get => _isBtOn;
-            set => SetProperty(ref _isBtOn, value);
+            get => _isBTEnabled;
+            set => SetProperty(ref _isBTEnabled, value);
+        }
+
+        public bool IsPermissionsGranted
+        {
+            get => _isBTEnabled;
+            set => SetProperty(ref _isBTEnabled, value);
         }
 
         private void StartStacExecute(object obj)
@@ -53,76 +55,78 @@ namespace BLETest
 
         private void StartScan()
         {
-            _manager.Adapter.ScanMode = ScanMode.LowLatency;
-            var cts = new CancellationTokenSource();
-            _manager.Adapter.StartScanningForDevicesAsync(allowDuplicatesKey: false, cancellationToken: cts.Token);
+            App.Bluetooth.SetScanMode(ScanMode.LowLatency);
+            App.Bluetooth.ScanAsync();
         }
 
         private void OnDeviceDiscovered(object sender, DeviceEventArgs e)
         {
-            Task.Run(() => { UpdateDevices(e); });
+            Device.BeginInvokeOnMainThread(()=>UpdateDevices(e));
         }
 
         private void UpdateDevices(DeviceEventArgs e)
         {
-            lock (_locker)
+            var devicesToRemove = new List<IDeviceInTest>();
+            var all = true;
+            foreach (var device in Devices)
             {
-                var devicesToRemove = new List<IDeviceInTest>();
-                var all = true;
-                foreach (var device in Devices)
+                if (device.ID == e.Device.Id)
                 {
-                    if (device.ID == e.Device.Id)
-                    {
-                        all = false;
-                        device.DiscoveryTimer.Restart();
-                    }
-                    if (device.DiscoveryTimer.Elapsed > TimeSpan.FromMinutes(_disappearingTime))
-                        devicesToRemove.Add(device);
+                    all = false;
+                    device.DiscoveryTimer.Restart();
                 }
-                if (all)
-                {
-                    var testDevice = CreateDevice(e.Device);
-                    Devices.Insert(0, testDevice);
-                }
-                foreach (var device in devicesToRemove)
-                {
-                    _manager.Adapter.DisconnectDeviceAsync(device.Device);
-                    Devices.Remove(device);
-                }
+
+                if (device.DiscoveryTimer.Elapsed > TimeSpan.FromMinutes(_disappearingTime))
+                    devicesToRemove.Add(device);
+            }
+
+            if (all)
+            {
+                var testDevice = CreateDevice(e.Device);
+                Devices.Insert(0, testDevice);
+            }
+
+            foreach (var device in devicesToRemove)
+            {
+                device.DisconnectAsync();
+                Devices.Remove(device);
             }
         }
 
         private IDeviceInTest CreateDevice(IDevice device)
         {
-            var deviceInTest = new DeviceInTest(device, _manager.Adapter);
+            var deviceInTest = new DeviceInTest(device, App.Bluetooth);
             return deviceInTest;
         }
 
         private void OnStateChanged(object sender, BluetoothStateChangedArgs e)
         {
-            IsBTOn = e.NewState == BluetoothState.On;
-            if (IsBTOn)
+            IsBTEnabled = e.NewState == BleState.Enabled;
+            IsPermissionsGranted = App.Bluetooth.CheckPermissions();
+            if (IsBTEnabled && IsPermissionsGranted)
                 StartScan();
         }
     }
 
     internal class DeviceInTest : BindableBase, IDeviceInTest
     {
-        private readonly IAdapter _adapter;
+        private readonly IBluetooth _bluetooth;
         private int _isTestRunning;
         private bool _isTestSuccessful;
         private bool _isTesting;
+        private readonly MethodInfo[] _testMethods;
 
-        public DeviceInTest(IDevice device, IAdapter adapter)
+        public DeviceInTest(IDevice device, IBluetooth bluetooth)
         {
             Device = device;
-            _adapter = adapter;
+            _bluetooth = bluetooth;
             DiscoveryTimer = new Stopwatch();
             DiscoveryTimer.Start();
             StartTestCommand = new Command(async () => await TestAsync().ConfigureAwait(false));
             DisconnectCommand = new Command(async () => await DisconnectAsync().ConfigureAwait(false));
-        }
 
+            _testMethods = typeof(Tests).GetMethods(BindingFlags.Public | BindingFlags.Instance);
+        }
 
         public Guid ID => Device.Id;
         public string Name => Device.Name;
@@ -133,6 +137,7 @@ namespace BLETest
 
         public async Task<bool> TestAsync()
         {
+            //dont run testing on second tap
             if (Interlocked.CompareExchange(ref _isTestRunning, 1, 0) == 1)
                 return false;
 
@@ -140,7 +145,12 @@ namespace BLETest
             try
             {
                 IsTesting = true;
-                result = await Tests.Test1(Device, _adapter);
+
+                foreach (var method in _testMethods)
+                {
+                    result = await (Task<bool>)method.Invoke(null, new object[] {Device, _bluetooth});
+                }
+
                 return result;
             }
             catch (Exception)
@@ -152,6 +162,13 @@ namespace BLETest
                 IsTesting = false;
                 IsTestSuccessful = result;
                 _isTestRunning = 0;
+
+                try
+                {
+                    await _bluetooth.Disconnect(Device);
+                }
+                catch (Exception)
+                {}
             }
             return IsTestSuccessful;
         }
@@ -164,7 +181,7 @@ namespace BLETest
 
         public async Task DisconnectAsync()
         {
-            await _adapter.DisconnectDeviceAsync(Device).ConfigureAwait(false);
+            await _bluetooth.Disconnect(Device).ConfigureAwait(false);
         }
 
         public bool IsTestSuccessful

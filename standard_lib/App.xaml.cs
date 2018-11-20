@@ -2,19 +2,22 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
+using standard_lib;
 using Xamarin.Forms;
 
 namespace BLETest
 {
     public partial class App : Application
     {
-        public App()
+        public App(IBluetooth bluetooth)
         {
             InitializeComponent();
 
+            Bluetooth = bluetooth;
             MainPage = new BLETest.MainPage();
         }
+
+        public static IBluetooth Bluetooth { get; set; }
 
         protected override void OnStart()
         {
