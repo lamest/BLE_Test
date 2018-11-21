@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
-using standard_lib.Bluetooth;
 
-namespace standard_lib
+namespace standard_lib.Bluetooth
 {
     public interface IDevice
     {

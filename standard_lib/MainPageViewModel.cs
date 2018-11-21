@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using standard_lib;
+using standard_lib.Bluetooth;
 using Xamarin.Forms;
 
 namespace BLETest
@@ -13,51 +14,25 @@ namespace BLETest
     public class MainPageViewModel : BindableBase
     {
         private readonly double _disappearingTime = 3;
-        private bool _isBTEnabled;
 
         public MainPageViewModel()
         {
-            if (!App.Bluetooth.CheckAvailability())
-                throw new Exception("BLE is not available.");
+            if (App.Bluetooth.IsAvailable)
+            {
+                App.Bluetooth.DeviceDiscovered += OnDeviceDiscovered;
 
-            IsPermissionsGranted = App.Bluetooth.CheckPermissions();
-            IsBTEnabled = App.Bluetooth.CheckState() == BleState.Enabled;
-            if (IsBTEnabled && IsPermissionsGranted)
-                StartScan();
-            App.Bluetooth.DeviceDiscovered += OnDeviceDiscovered;
-            App.Bluetooth.StateChanged += OnStateChanged;
-
-            Devices = new ObservableCollection<IDeviceInTest>();
-            StartScanCommand = new Command(StartStacExecute);
+                Devices = new ObservableCollection<IDeviceInTest>();
+                StartScanCommand = new Command(App.Bluetooth.Scan);
+                if (App.Bluetooth.IsPermitted)
+                {
+                    App.Bluetooth.Scan();
+                }
+            }
         }
 
         public Command StartScanCommand { get; set; }
 
-
         public ObservableCollection<IDeviceInTest> Devices { get; set; }
-
-        public bool IsBTEnabled
-        {
-            get => _isBTEnabled;
-            set => SetProperty(ref _isBTEnabled, value);
-        }
-
-        public bool IsPermissionsGranted
-        {
-            get => _isBTEnabled;
-            set => SetProperty(ref _isBTEnabled, value);
-        }
-
-        private void StartStacExecute(object obj)
-        {
-            StartScan();
-        }
-
-        private void StartScan()
-        {
-            App.Bluetooth.SetScanMode(ScanMode.LowLatency);
-            App.Bluetooth.ScanAsync();
-        }
 
         private void OnDeviceDiscovered(object sender, DeviceEventArgs e)
         {
@@ -97,14 +72,6 @@ namespace BLETest
         {
             var deviceInTest = new DeviceInTest(device, App.Bluetooth);
             return deviceInTest;
-        }
-
-        private void OnStateChanged(object sender, BluetoothStateChangedArgs e)
-        {
-            IsBTEnabled = e.NewState == BleState.Enabled;
-            IsPermissionsGranted = App.Bluetooth.CheckPermissions();
-            if (IsBTEnabled && IsPermissionsGranted)
-                StartScan();
         }
     }
 
