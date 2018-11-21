@@ -14,21 +14,31 @@ namespace BLETest
     public class MainPageViewModel : BindableBase
     {
         private readonly double _disappearingTime = 3;
+        public IBluetooth Bluetooth { get; }
 
         public MainPageViewModel()
         {
-            if (App.Bluetooth.IsAvailable)
+            Bluetooth = DependencyService.Get<IBluetooth>();
+            if (Bluetooth.IsAvailable)
             {
-                App.Bluetooth.DeviceDiscovered += OnDeviceDiscovered;
+                Bluetooth.DeviceDiscovered += OnDeviceDiscovered;
 
                 Devices = new ObservableCollection<IDeviceInTest>();
-                StartScanCommand = new Command(App.Bluetooth.Scan);
-                if (App.Bluetooth.IsPermitted)
+                StartScanCommand = new Command(Bluetooth.Scan);
+                if (Bluetooth.IsPermitted)
                 {
-                    App.Bluetooth.Scan();
+                    Bluetooth.Scan();
                 }
             }
+            RequestPermissionsCommand = new Command(RequestPermissionsCommandExecute);
         }
+
+        private void RequestPermissionsCommandExecute(object obj)
+        {
+            Bluetooth.RequestPermissions();
+        }
+
+        public Command RequestPermissionsCommand { get; set; }
 
         public Command StartScanCommand { get; set; }
 
@@ -70,7 +80,7 @@ namespace BLETest
 
         private IDeviceInTest CreateDevice(IDevice device)
         {
-            var deviceInTest = new DeviceInTest(device, App.Bluetooth);
+            var deviceInTest = new DeviceInTest(device, Bluetooth);
             return deviceInTest;
         }
     }

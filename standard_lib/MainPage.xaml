@@ -21,13 +21,14 @@
                 <Label Text="Grant permissions"
                        TextColor="Blue"
                        TextDecorations="Underline"
-                       Margin="0,20,0,0">
+                       Margin="0,20,0,0"
+                       IsVisible="{Binding Bluetooth.IsPermitted, Converter={StaticResource BoolInversionConverter}}">
                     <Label.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GrantPermissionsCommand}"/>
+                        <TapGestureRecognizer Command="{Binding RequestPermissionsCommand}"/>
                     </Label.GestureRecognizers>
                 </Label>
-                <Label Text="Turn blutooth on."
-                       IsVisible="{Binding IsBTEnabled, Converter={StaticResource BoolInversionConverter}}" Margin="0,20,0,0"
+                <Label Text="Turn blutooth on"
+                       IsVisible="{Binding Bluetooth.IsOn, Converter={StaticResource BoolInversionConverter}}" Margin="0,20,0,0"
                        HorizontalOptions="Center" />
             </StackLayout>
             <StackLayout IsVisible="{Binding IsBTEnabled}">

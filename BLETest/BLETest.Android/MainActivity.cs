@@ -7,6 +7,7 @@ using Android.OS;
 using Microsoft.AppCenter;
 using Microsoft.AppCenter.Analytics;
 using standard_lib;
+using standard_lib.Bluetooth;
 using Xamarin.Forms;
 using Xamarin.Forms.Platform.Android;
 
@@ -27,8 +28,8 @@ namespace BLETest.Droid
             AppCenter.Start("bc3f2ae7-f40f-448e-91aa-88c0c6df8fd9", typeof(Analytics));
             Forms.Init(this, bundle);
             Analytics.TrackEvent(AnalitycsEvents.AppStarted);
-            _bluetooth = new AndroidBluetooth(this);
-            LoadApplication(new App(_bluetooth));
+            _bluetooth = (AndroidBluetooth)DependencyService.Get<IBluetooth>();
+            LoadApplication(new App());
         }
 
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults) => _bluetooth.OnRequestPermissionsResult();

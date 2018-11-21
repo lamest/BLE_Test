@@ -13,8 +13,11 @@ using BLETest;
 using BLETest.Droid;
 using standard_lib;
 using standard_lib.Bluetooth;
+using Xamarin.Forms;
+using Application = Android.App.Application;
 using ScanMode = standard_lib.Bluetooth.ScanMode;
 
+[assembly: Dependency(typeof(AndroidBluetooth))]
 public class AndroidBluetooth : BindableBase, IBluetooth
 {
     private static readonly string[] RequiredPermissions =
@@ -25,33 +28,63 @@ public class AndroidBluetooth : BindableBase, IBluetooth
         Manifest.Permission.AccessFineLocation
     };
 
-    private readonly Activity _context;
-    private BluetoothManager _bluetoothManager;
+    private readonly Context _context;
+    private readonly BluetoothManager _bluetoothManager;
+    private bool _isPermitted;
     private int _requestId;
-    private Api21BleScanCallback _scanCallback;
+    private readonly Api21BleScanCallback _scanCallback;
     private ScanMode _scanMode;
-    private volatile BluetoothState _state;
+    private bool _isOn;
 
-    public AndroidBluetooth(Activity context)
+    public AndroidBluetooth()
     {
-        _context = context;
-        InitializeNative();
+        _context = Application.Context;
+        if (!_context.PackageManager.HasSystemFeature(PackageManager.FeatureBluetoothLe))
+        {
+            IsAvailable = false;
+            return;
+        }
+
+        var statusChangeReceiver = new BluetoothStatusBroadcastReceiver(UpdateState);
+        _context.RegisterReceiver(statusChangeReceiver, new IntentFilter(BluetoothAdapter.ActionStateChanged));
+
+        _bluetoothManager = (BluetoothManager)_context.GetSystemService(Context.BluetoothService);
+        if (_bluetoothManager == null)
+        {
+            IsAvailable = false;
+            return;
+        }
+
+        IsAvailable = true;
+
+        IsOn = _bluetoothManager.Adapter.State == State.On;
+
+        _scanCallback = new Api21BleScanCallback(this);
+
+        Mode = ScanMode.LowLatency;
+        CheckPermissions();
     }
 
     public ScanMode Mode
     {
         get => _scanMode;
-        set => SetProperty(ref _scanMode, value);
+        private set => SetProperty(ref _scanMode, value);
     }
 
     public event DeviceDiscoveredHandler DeviceDiscovered;
 
-    public bool IsPermitted { get; }
+    public bool IsAvailable { get; }
 
-    public BluetoothState State
+    public bool IsPermitted
     {
-        get => _state;
-        set => SetProperty(ref _state, value);
+        get => _isPermitted;
+        private set => SetProperty(ref _isPermitted, value);
+    }
+
+    public bool IsOn
+    {
+        get => _isOn;
+        private set => SetProperty(ref _isOn, value);
     }
 
     public async Task<bool> Disconnect(IDevice device)
@@ -66,12 +99,10 @@ public class AndroidBluetooth : BindableBase, IBluetooth
         return await d.Connect().ConfigureAwait(false);
     }
 
-    public bool IsAvailable { get; private set; }
-
     public void RequestPermissions()
     {
         _requestId++;
-        ActivityCompat.RequestPermissions(_context, RequiredPermissions, _requestId);
+        ActivityCompat.RequestPermissions((Activity)_context, RequiredPermissions, _requestId);
     }
 
     public void Scan()
@@ -96,42 +127,15 @@ public class AndroidBluetooth : BindableBase, IBluetooth
         _bluetoothManager.Adapter.BluetoothLeScanner.StopScan(_scanCallback);
     }
 
-    public bool CheckAvailability()
+    public void CheckPermissions()
     {
-        var state = State;
-        return state != BluetoothState.Unavailable &&
-               state != BluetoothState.Unknown;
+        IsPermitted =
+            RequiredPermissions.Any(p => ContextCompat.CheckSelfPermission(_context, p) != Permission.Granted);
     }
 
-    private bool CheckPermissions()
+    private void UpdateState(State state)
     {
-        IsAvailable =
-            RequiredPermissions.All(p => ContextCompat.CheckSelfPermission(_context, p) == Permission.Granted);
-        return IsAvailable;
-    }
-
-    private void InitializeNative()
-    {
-        var ctx = Application.Context;
-        if (!ctx.PackageManager.HasSystemFeature(PackageManager.FeatureBluetoothLe))
-        {
-            State = BluetoothState.Unavailable;
-            return;
-        }
-
-        var statusChangeReceiver = new BluetoothStatusBroadcastReceiver(UpdateState);
-        ctx.RegisterReceiver(statusChangeReceiver, new IntentFilter(BluetoothAdapter.ActionStateChanged));
-
-        _bluetoothManager = (BluetoothManager) ctx.GetSystemService(Context.BluetoothService);
-
-        State = _bluetoothManager?.Adapter.State.ToBluetoothState() ?? BluetoothState.Unavailable;
-
-        _scanCallback = new Api21BleScanCallback(this);
-    }
-
-    private void UpdateState(BluetoothState state)
-    {
-        State = state;
+        IsOn = state == State.On;
     }
 
     public void HandleDiscoveredDevice(IDevice device)

@@ -1,14 +1,12 @@
 ﻿using System;
 using Android.Bluetooth;
 using Android.Content;
-using BLETest.Droid;
-using standard_lib.Bluetooth;
 
 public class BluetoothStatusBroadcastReceiver : BroadcastReceiver
 {
-    private readonly Action<BluetoothState> _stateChangedHandler;
+    private readonly Action<State> _stateChangedHandler;
 
-    public BluetoothStatusBroadcastReceiver(Action<BluetoothState> stateChangedHandler)
+    public BluetoothStatusBroadcastReceiver(Action<State> stateChangedHandler)
     {
         _stateChangedHandler = stateChangedHandler;
     }
@@ -24,11 +22,11 @@ public class BluetoothStatusBroadcastReceiver : BroadcastReceiver
 
         if (state == -1)
         {
-            _stateChangedHandler?.Invoke(BluetoothState.Unknown);
+            _stateChangedHandler?.Invoke(State.Off);
             return;
         }
 
-        var btState = (State)state;
-        _stateChangedHandler?.Invoke(btState.ToBluetoothState());
+        var btState = (State) state;
+        _stateChangedHandler?.Invoke(btState);
     }
 }
