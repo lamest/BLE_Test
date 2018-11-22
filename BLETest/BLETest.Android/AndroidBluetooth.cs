@@ -1,21 +1,21 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Android;
+using Android.App;
 using Android.Bluetooth;
 using Android.Bluetooth.LE;
 using Android.Content;
 using Android.Content.PM;
-using BLETest.Droid;
 using standard_lib;
 using standard_lib.Bluetooth;
-using Xamarin.Forms;
-using Application = Android.App.Application;
 using ScanMode = standard_lib.Bluetooth.ScanMode;
 
 namespace BLETest.Droid
 {
-    public class AndroidBluetooth : BindableBase, IBluetooth
+    public class AndroidBluetooth : BindableBase, IBluetooth, IScanOwner
     {
         private static readonly string[] RequiredPermissions =
         {
@@ -33,9 +33,15 @@ namespace BLETest.Droid
         private bool _isOn;
         private bool _isPermitted;
         private ScanMode _scanMode;
+        private object _deviceRegistration=new object();
+        private IList<BleDevice> _devices;
+        private static TimeSpan _removeTime = TimeSpan.FromMinutes(1);
+
 
         public AndroidBluetooth(IPermissions permissions)
         {
+
+            _devices = new List<BleDevice>();
             _context = Application.Context;
             _permissions = permissions;
             _permissions.OnRequestResult += OnRequestPermissionsResult;
@@ -93,10 +99,33 @@ namespace BLETest.Droid
             return await d.Disconnect().ConfigureAwait(false);
         }
 
-        public async Task<bool> Connect(IDevice device)
+        public void Connect(IDevice device)
         {
             var d = (BleDevice) device;
-            return await d.Connect().ConfigureAwait(false);
+            d.Connect();
+            RegisterDevice(d);
+        }
+
+        private void RegisterDevice(BleDevice bleDevice)
+        {
+            lock (_deviceRegistration)
+            {
+                _devices.Add(bleDevice);
+                bleDevice.Disconnected += OnDeviceDisconnected;
+            }
+        }
+
+        private void OnDeviceDisconnected(object sender, Guid e)
+        {
+            lock (_deviceRegistration)
+            {
+                var device = _devices.FirstOrDefault(x => x.Id == e);
+                if (device != null)
+                {
+                    device.Disconnected -= OnDeviceDisconnected;
+                    _devices.Remove(device);
+                }
+            }
         }
 
         public void RequestPermissions()
@@ -126,20 +155,49 @@ namespace BLETest.Droid
             _bluetoothManager.Adapter.BluetoothLeScanner.StopScan(_scanCallback);
         }
 
-        public void CheckPermissions()
+        private void CheckPermissions()
         {
             var value = _permissions.Check(RequiredPermissions);
             IsPermitted = value;
         }
 
+        void IScanOwner.HandleDiscoveredDevice(BluetoothDevice device, int rssi, ScanRecord scanRecord)
+        {
+            BleDevice discoveredDevice = null;
+            lock (_deviceRegistration)
+            {
+                var devicesToRemove=new List<BleDevice>(_devices.Count);
+                foreach (var d in _devices)
+                {
+                    if (d.Address == device.Address)
+                    {
+                        d.Stopwatch.Restart();
+                        discoveredDevice = d;
+                    }
+                    else if (d.Stopwatch.Elapsed > _removeTime)
+                    {
+                        devicesToRemove.Add(d);
+                    }
+                }
+
+                foreach (var remove in devicesToRemove)
+                {
+                    _devices.Remove(remove);
+                }
+
+                if (discoveredDevice == null)
+                {
+                    discoveredDevice = new BleDevice(device, rssi, scanRecord);
+                    RegisterDevice(discoveredDevice);
+                }
+            }
+
+            DeviceDiscovered?.Invoke(this, new DeviceEventArgs(discoveredDevice));
+        }
+
         private void UpdateState(State state)
         {
             IsOn = state == State.On;
-        }
-
-        public void HandleDiscoveredDevice(IDevice device)
-        {
-            DeviceDiscovered?.Invoke(this, new DeviceEventArgs(device));
         }
 
         private void OnRequestPermissionsResult(object sender, EventArgs e)

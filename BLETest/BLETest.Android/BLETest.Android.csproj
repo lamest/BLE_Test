@@ -144,9 +144,15 @@
   <ItemGroup>
     <Compile Include="AndroidBluetooth.cs" />
     <Compile Include="Api21BleScanCallback.cs" />
+    <Compile Include="BleCharacteristic.cs" />
     <Compile Include="BleDevice.cs" />
+    <Compile Include="BleService.cs" />
     <Compile Include="BluetoothStatusBroadcastReceiver.cs" />
     <Compile Include="ExtensionMethods.cs" />
+    <Compile Include="GattCallback.cs" />
+    <Compile Include="IGattOwner.cs" />
+    <Compile Include="IEventBasedDevice.cs" />
+    <Compile Include="IScanOwner.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.Designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -92,7 +92,7 @@ namespace BLETest
         private int _isTestRunning;
         private bool _isTestSuccessful;
         private bool _isTesting;
-        private readonly MethodInfo[] _testMethods;
+        private static readonly MethodInfo[] _testMethods = typeof(Tests).GetMethods(BindingFlags.Public | BindingFlags.Instance);
 
         public DeviceInTest(IDevice device, IBluetooth bluetooth)
         {
@@ -102,8 +102,7 @@ namespace BLETest
             DiscoveryTimer.Start();
             StartTestCommand = new Command(async () => await TestAsync().ConfigureAwait(false));
             DisconnectCommand = new Command(async () => await DisconnectAsync().ConfigureAwait(false));
-
-            _testMethods = typeof(Tests).GetMethods(BindingFlags.Public | BindingFlags.Instance);
+            StartTestCommand.Execute(null);
         }
 
         public Guid ID => Device.Id;

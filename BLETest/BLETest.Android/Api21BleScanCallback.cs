@@ -5,11 +5,11 @@ namespace BLETest.Droid
 {
     public class Api21BleScanCallback : ScanCallback
     {
-        private readonly AndroidBluetooth _bluetooth;
+        private readonly IScanOwner _owner;
 
-        public Api21BleScanCallback(AndroidBluetooth bluetooth)
+        public Api21BleScanCallback(IScanOwner owner)
         {
-            _bluetooth = bluetooth;
+            _owner = owner;
         }
 
         public override void OnScanFailed(ScanFailure errorCode)
@@ -49,8 +49,6 @@ namespace BLETest.Droid
                 records.Add(new AdvertisementRecord(AdvertisementRecordType.ServiceData, result.ScanRecord.ServiceData));
             }*/
 
-            var device = new BleDevice(result.Device, result.Rssi, result.ScanRecord);
-
             //Device device;
             //if (result.ScanRecord.ManufacturerSpecificData.Size() > 0)
             //{
@@ -66,7 +64,7 @@ namespace BLETest.Droid
             //    device = new Device(result.Device, null, null, result.Rssi, new byte[0]);
             //}
 
-            _bluetooth.HandleDiscoveredDevice(device);
+            _owner.HandleDiscoveredDevice(result.Device, result.Rssi, result.ScanRecord);
         }
     }
 }

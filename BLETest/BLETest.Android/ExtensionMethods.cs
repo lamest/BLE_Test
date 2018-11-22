@@ -27,5 +27,9 @@ namespace BLETest.Droid
                     throw new ArgumentOutOfRangeException(nameof(scanMode), scanMode, null);
             }
         }
+        public static string ToHexString(this byte[] bytes)
+        {
+            return bytes != null ? BitConverter.ToString(bytes) : string.Empty;
+        }
     }
 }
