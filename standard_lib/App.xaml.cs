@@ -1,15 +1,18 @@
-﻿using Xamarin.Forms;
+﻿using standard_lib.Bluetooth;
+using Xamarin.Forms;
 
 namespace BLETest
 {
     public partial class App : Application
     {
-        public App()
+        public App(IBluetooth bluetooth)
         {
             InitializeComponent();
-
+            Bluetooth = bluetooth;
             MainPage = new MainPage();
         }
+
+        public static IBluetooth Bluetooth { get; private set; }
 
         protected override void OnStart()
         {

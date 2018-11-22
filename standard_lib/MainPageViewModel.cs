@@ -13,12 +13,12 @@ namespace BLETest
 {
     public class MainPageViewModel : BindableBase
     {
-        private readonly double _disappearingTime = 3;
+        private readonly TimeSpan _disappearingTime = TimeSpan.FromMinutes(3);
         public IBluetooth Bluetooth { get; }
 
         public MainPageViewModel()
         {
-            Bluetooth = DependencyService.Get<IBluetooth>();
+            Bluetooth = App.Bluetooth;
             if (Bluetooth.IsAvailable)
             {
                 Bluetooth.DeviceDiscovered += OnDeviceDiscovered;
@@ -61,7 +61,7 @@ namespace BLETest
                     device.DiscoveryTimer.Restart();
                 }
 
-                if (device.DiscoveryTimer.Elapsed > TimeSpan.FromMinutes(_disappearingTime))
+                if (device.DiscoveryTimer.Elapsed > _disappearingTime)
                     devicesToRemove.Add(device);
             }
 
@@ -73,6 +73,7 @@ namespace BLETest
 
             foreach (var device in devicesToRemove)
             {
+                device.DiscoveryTimer.Stop();
                 device.DisconnectAsync();
                 Devices.Remove(device);
             }

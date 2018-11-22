@@ -3,7 +3,6 @@
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:BLETest"
-             xmlns:standardLib="clr-namespace:standard_lib;assembly=standard_lib"
              x:Class="BLETest.MainPage"
              x:Name="thePage">
     <ContentPage.Resources>
@@ -20,18 +19,22 @@
             <StackLayout>
                 <Label Text="Grant permissions"
                        TextColor="Blue"
+                       FontSize="Medium"
                        TextDecorations="Underline"
                        Margin="0,20,0,0"
-                       IsVisible="{Binding Bluetooth.IsPermitted, Converter={StaticResource BoolInversionConverter}}">
+                       IsVisible="{Binding Bluetooth.IsPermitted, Converter={StaticResource BoolInversionConverter}}"
+                       HorizontalOptions="Center">
                     <Label.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding RequestPermissionsCommand}"/>
+                        <TapGestureRecognizer Command="{Binding RequestPermissionsCommand}" />
                     </Label.GestureRecognizers>
                 </Label>
                 <Label Text="Turn blutooth on"
-                       IsVisible="{Binding Bluetooth.IsOn, Converter={StaticResource BoolInversionConverter}}" Margin="0,20,0,0"
+                       IsVisible="{Binding Bluetooth.IsOn, Converter={StaticResource BoolInversionConverter}}"
+                       Margin="0,20,0,0"
+                       FontSize="Medium"
                        HorizontalOptions="Center" />
             </StackLayout>
-            <StackLayout IsVisible="{Binding IsBTEnabled}">
+            <StackLayout IsVisible="{Binding Bluetooth.IsPermitted}">
                 <Button Text="Update" Command="{Binding StartScanCommand}" HorizontalOptions="Fill" />
                 <local:RepeaterView ItemsSource="{Binding Devices}" Margin="0,10,0,0">
                     <local:RepeaterView.ItemTemplate>
@@ -55,13 +58,14 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackLayout  Grid.Column="0" Orientation="Vertical">
-                                    <Label Text="{Binding Name}" 
-                                           InputTransparent="True" />
-                                    <Label Text="{Binding ID, Converter={StaticResource GuidToStringConverter}}" 
-                                           InputTransparent="True" />
+                                    <StackLayout Grid.Column="0" Orientation="Vertical">
+                                        <Label Text="{Binding Name}"
+                                               InputTransparent="True" />
+                                        <Label Text="{Binding ID, Converter={StaticResource GuidToStringConverter}}"
+                                               InputTransparent="True" />
                                     </StackLayout>
-                                    <Button Grid.Column="1" WidthRequest="50" Text="DC"  Command="{Binding DisconnectCommand}"></Button>
+                                    <Button Grid.Column="1" WidthRequest="50" Text="DC"
+                                            Command="{Binding DisconnectCommand}" />
                                 </Grid>
                                 <Grid.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding StartTestCommand}" />
