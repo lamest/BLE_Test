@@ -26,10 +26,15 @@ namespace BLETest
 
             _manager = manager;
             IsBTOn = _manager.IsOn;
+            IsPermitted = _manager.;
             if (IsBTOn)
                 StartScan();
             _manager.Adapter.DeviceDiscovered += OnDeviceDiscovered;
             _manager.StateChanged += OnStateChanged;
+            if (_manager.State == BluetoothState.Unavailable)
+            {
+
+            }
 
             Devices = new ObservableCollection<IDeviceInTest>();
             StartScanCommand = new Command(StartStacExecute);
