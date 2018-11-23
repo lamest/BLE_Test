@@ -34,7 +34,7 @@
                        FontSize="Medium"
                        HorizontalOptions="Center" />
             </StackLayout>
-            <StackLayout IsVisible="{Binding IsBTOn}">
+            <StackLayout IsVisible="{Binding IsPermitted}">
                 <Button Text="Update" Command="{Binding StartScanCommand}" HorizontalOptions="Fill" />
                 <local:RepeaterView ItemsSource="{Binding Devices}" Margin="0,10,0,0">
                     <local:RepeaterView.ItemTemplate>

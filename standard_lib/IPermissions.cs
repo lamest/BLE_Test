@@ -4,8 +4,10 @@ using System.Text;
 
 namespace standard_lib
 {
-    interface IPermissions
+    public interface IPermissions
     {
-
+        void Request();
+        event EventHandler OnRequestResult;
+        bool Check();
     }
 }

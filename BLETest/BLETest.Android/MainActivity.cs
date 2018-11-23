@@ -1,17 +1,43 @@
 ﻿using System;
-
+using System.Linq;
+using Android;
 using Android.App;
 using Android.Content.PM;
-using Android.Runtime;
-using Android.Views;
-using Android.Widget;
 using Android.OS;
+using Android.Support.V4.App;
+using Android.Support.V4.Content;
+using standard_lib;
+using Xamarin.Forms;
+using Xamarin.Forms.Platform.Android;
 
 namespace BLETest.Droid
 {
-    [Activity(Label = "BLETest", Icon = "@drawable/icon", Theme = "@style/MainTheme", MainLauncher = true, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation)]
-    public class MainActivity : global::Xamarin.Forms.Platform.Android.FormsAppCompatActivity
+    [Activity(Label = "BLETest", Icon = "@drawable/icon", Theme = "@style/MainTheme", MainLauncher = true,
+        ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation)]
+    public class MainActivity : FormsAppCompatActivity, IPermissions
     {
+        private static readonly string[] _requiredPermissions =
+        {
+            Manifest.Permission.Bluetooth,
+            Manifest.Permission.BluetoothAdmin,
+            Manifest.Permission.AccessCoarseLocation,
+            Manifest.Permission.AccessFineLocation
+        };
+
+        public void Request()
+        {
+            ActivityCompat.RequestPermissions(this, _requiredPermissions, 0);
+        }
+
+        public event EventHandler OnRequestResult;
+
+        public bool Check()
+        {
+            var value = _requiredPermissions.All(p =>
+                ContextCompat.CheckSelfPermission(this, p) == Permission.Granted);
+            return value;
+        }
+
         protected override void OnCreate(Bundle bundle)
         {
             TabLayoutResource = Resource.Layout.Tabbar;
@@ -19,9 +45,16 @@ namespace BLETest.Droid
 
             base.OnCreate(bundle);
 
-            global::Xamarin.Forms.Forms.Init(this, bundle);
+            Permissions.SetInstance(this);
+
+            Forms.Init(this, bundle);
             LoadApplication(new App());
+        }
+
+        public override void OnRequestPermissionsResult(int requestCode, string[] permissions,
+            Permission[] grantResults)
+        {
+            OnRequestResult?.Invoke(null, null);
         }
     }
 }
-
