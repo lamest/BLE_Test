@@ -181,6 +181,8 @@ namespace BLETest
             {
                 IsTesting = true;
 
+                await _adapter.ConnectToDeviceAsync(Device).ConfigureAwait(false);
+                await Task.Delay(1500).ConfigureAwait(false);
                 foreach (var method in _testMethods)
                 {
                     await (Task) method.Invoke(null, new object[] {Device, _adapter});
