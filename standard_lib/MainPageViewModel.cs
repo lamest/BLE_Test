@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Plugin.BLE;
@@ -135,8 +136,11 @@ namespace BLETest
     {
         private readonly IAdapter _adapter;
         private bool _isTesting;
-        private int _isTestRunning;
+        private volatile int _isTestRunning;
         private bool _isTestSuccessful;
+        private string _error;
+        private static readonly MethodInfo[] _testMethods = typeof(Tests).GetMethods(BindingFlags.Public | BindingFlags.Static);
+
 
         public DeviceInTest(IDevice device, IAdapter adapter)
         {
@@ -162,30 +166,48 @@ namespace BLETest
         public Command StartTestCommand { get; set; }
         public Command DisconnectCommand { get; set; }
 
-        public async Task<bool> TestAsync()
+        public string Error
+        {
+            get => _error;
+            set => SetProperty(ref _error, value);
+        }
+
+        public async Task TestAsync()
         {
             if (Interlocked.CompareExchange(ref _isTestRunning, 1, 0) == 1)
-                return false;
+                return;
 
-            var result = false;
             try
             {
                 IsTesting = true;
-                result = await Tests.Test1(Device, _adapter);
-                return result;
+
+                foreach (var method in _testMethods)
+                {
+                    await (Task) method.Invoke(null, new object[] {Device, _adapter});
+                }
+
+                Error = string.Empty;
+                IsTestSuccessful = true;
             }
-            catch (Exception)
+            catch (TestException ex1)
             {
-                result = false;
+                Error = ex1.Message;
+            }
+            catch (Exception ex)
+            {
+                Error = "Phone error: " + ex.Message;
             }
             finally
             {
                 IsTesting = false;
-                IsTestSuccessful = result;
                 _isTestRunning = 0;
+                try
+                {
+                    await _adapter.DisconnectDeviceAsync(Device);
+                }
+                catch (Exception)
+                { }
             }
-
-            return IsTestSuccessful;
         }
 
         public async Task DisconnectAsync()
@@ -211,7 +233,7 @@ namespace BLETest
         Command DisconnectCommand { get; set; }
         bool IsTestSuccessful { get; }
         Stopwatch DiscoveryTimer { get; set; }
-        Task<bool> TestAsync();
+        Task TestAsync();
         Task DisconnectAsync();
     }
 }

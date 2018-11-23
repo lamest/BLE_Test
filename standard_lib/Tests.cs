@@ -1,82 +1,66 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Plugin.BLE.Abstractions.Contracts;
+using standard_lib;
 
 namespace BLETest
 {
     public static class Tests
     {
-        public static async Task<bool> Test1(IDevice device, IAdapter adapter)
+        private static readonly string ServiceTemplate = "f119{0}-71a4-11e6-bdf4-0800200c9a66";
+
+        //private static string _defaultPass = "000000";
+        private static readonly byte[] _defaultPassBytes = {0x30, 0x30, 0x30, 0x30, 0x30, 0x30};
+
+        public static async Task Test1(IDevice device, IAdapter adapter)
         {
-            bool testResult = true;
+            await adapter.ConnectToDeviceAsync(device).ConfigureAwait(false);
+            await Task.Delay(1500).ConfigureAwait(false);
+            var services = await device.GetServicesAsync().RunUntillAsync().ConfigureAwait(false);
+            InsureServices(services);
+
+            var movService = services.First(x => x.Id == GuidCollection.MOVEMENT_SERV_UUID);
+            var chars = await movService.GetCharacteristicsAsync();
+            InsureMovementServiceChars(chars);
+
+            var output = chars.First(x => x.Id == GuidCollection.MOVEMENT_UID_UUID);
+            var outputResult = await output.ReadAsync();
+            if (outputResult.Length != 0) throw new TestException($"fail to read {GuidCollection.MOVEMENT_UID_UUID}");
+            var passChar = chars.First(x => x.Id == GuidCollection.MOVEMENT_PASS_UUID);
+
+            var writeResult = await passChar.WriteAsync(_defaultPassBytes).ConfigureAwait(false);
+            if (!writeResult) throw new TestException($"fail to write password to {GuidCollection.MOVEMENT_PASS_UUID}");
+
+            outputResult = await output.ReadAsync().ConfigureAwait(false);
+            if (outputResult.Length == 0) throw new TestException($"fail to read {GuidCollection.MOVEMENT_UID_UUID}");
+        }
+
+        private static void InsureMovementServiceChars(IList<ICharacteristic> chars)
+        {
             try
             {
-                await adapter.ConnectToDeviceAsync(device);
-                await Task.Delay(1500);
-                var searchServicesTask= device.GetServicesAsync();
-                if (await Task.WhenAny(Task.Delay(10000), searchServicesTask)!= searchServicesTask)
-                {
-                    return false;
-                }
-                var services = await searchServicesTask;
-                testResult &= InsureServices(services);
-                if (!testResult) return false;
-                var movService = services.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_SERV_UUID);
-                var chars = await movService.GetCharacteristicsAsync();
-                testResult &= InsureMovementServiceChars(chars);
-                if (!testResult) return false;
-                var output = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_UID_UUID);
-                var outputResult = await output.ReadAsync();
-                testResult &= outputResult.Length == 0;
-                if (!testResult) return false;
-                var passChar = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_PASS_UUID);
-                testResult &= await passChar.WriteAsync(_defaultPassBytes);
-                if (!testResult) return false;
-                outputResult = await output.ReadAsync();
-                testResult &= outputResult.Length != 0;
+                var acsData = chars.First(x => x.Id == GuidCollection.MOVEMENT_ACSDATA_UUID);
+                var backSide = chars.First(x => x.Id == GuidCollection.MOVEMENT_BACKSIDE_UUID);
+                var history = chars.First(x => x.Id == GuidCollection.MOVEMENT_HISTORY_UUID);
+                var cmd = chars.First(x => x.Id == GuidCollection.MOVEMENT_CMD_UUID);
+                var tap = chars.First(x => x.Id == GuidCollection.MOVEMENT_TAP_UUID);
+                var uid = chars.First(x => x.Id == GuidCollection.MOVEMENT_UID_UUID);
+                var pass = chars.First(x => x.Id == GuidCollection.MOVEMENT_PASS_UUID);
             }
             catch (Exception ex)
             {
-                testResult = false;
+                throw new TestException("One of MovementServiceChars not found", ex);
             }
-            finally
-            {
-                adapter.DisconnectDeviceAsync(device);
-            }
-            return testResult;
         }
 
-        private static bool InsureMovementServiceChars(IList<ICharacteristic> chars)
-        {
-            var acsData = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_ACSDATA_UUID);
-            if (acsData == default(ICharacteristic)) return false;
-            var backSide = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_BACKSIDE_UUID);
-            if (backSide == default(ICharacteristic)) return false;
-            var history = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_HISTORY_UUID);
-            if (history == default(ICharacteristic)) return false;
-            var cmd = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_CMD_UUID);
-            if (cmd == default(ICharacteristic)) return false;
-            var tap = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_TAP_UUID);
-            if (tap == default(ICharacteristic)) return false;
-            var uid = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_UID_UUID);
-            if (uid == default(ICharacteristic)) return false;
-            var pass = chars.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_PASS_UUID);
-            if (pass == default(ICharacteristic)) return false;
-            return true;
-        }
-
-        private static bool InsureServices(IList<IService> services)
+        private static void InsureServices(IList<IService> services)
         {
             var movService = services.FirstOrDefault(x => x.Id == GuidCollection.MOVEMENT_SERV_UUID);
-            return movService != default(IService);
+            if (movService == default(IService))
+                throw new TestException($"There is no {nameof(GuidCollection.MOVEMENT_SERV_UUID)} service");
         }
-
-        private static string ServiceTemplate = "f119{0}-71a4-11e6-bdf4-0800200c9a66";
-        //private static string _defaultPass = "000000";
-        private static byte[] _defaultPassBytes= new byte[]{0x30, 0x30, 0x30, 0x30, 0x30, 0x30 };
 
         private static class GuidCollection
         {
@@ -99,9 +83,8 @@ namespace BLETest
 //#define MOVEMENT_UID_UUID                                    0x6F56 // UID unique ID
 //#define MOVEMENT_PASS_UUID                                0x6F57 // UID password
 
-            public static readonly Guid CalibrationVersionCharachteristic =
+            private static readonly Guid CalibrationVersionCharachteristic =
                 Guid.Parse("F1196F56-71A4-11E6-BDF4-0800200C9A66");
-
         }
     }
 }
