@@ -22,7 +22,7 @@ namespace BLETest
 
         public MainPageViewModel()
         {
-            var manager = CrossBluetoothLE.Current;
+            var manager = Bluetooth.Current;
             if (!manager.IsAvailable)
                 throw new Exception("BLE is not available.");
 

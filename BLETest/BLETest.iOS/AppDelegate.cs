@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Foundation;
+using standard_lib;
 using UIKit;
 
 namespace BLETest.iOS
@@ -22,6 +23,8 @@ namespace BLETest.iOS
         //
         public override bool FinishedLaunching(UIApplication app, NSDictionary options)
         {
+            Permissions.SetInstance(this);
+
             global::Xamarin.Forms.Forms.Init();
             LoadApplication(new App());
 
