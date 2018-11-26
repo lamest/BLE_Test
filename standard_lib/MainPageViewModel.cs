@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Plugin.BLE;
+using Microsoft.AppCenter.Analytics;
 using Plugin.BLE.Abstractions.Contracts;
 using Plugin.BLE.Abstractions.EventArgs;
 using standard_lib;
@@ -134,12 +134,13 @@ namespace BLETest
 
     internal class DeviceInTest : BindableBase, IDeviceInTest
     {
+        private static readonly MethodInfo[] _testMethods = typeof(Tests).GetMethods(BindingFlags.Public | BindingFlags.Static);
         private readonly IAdapter _adapter;
+        private string _error;
         private bool _isTesting;
         private volatile int _isTestRunning;
         private bool _isTestSuccessful;
-        private string _error;
-        private static readonly MethodInfo[] _testMethods = typeof(Tests).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        private CancellationTokenSource _tokenSource;
 
 
         public DeviceInTest(IDevice device, IAdapter adapter)
@@ -158,6 +159,12 @@ namespace BLETest
             set => SetProperty(ref _isTesting, value);
         }
 
+        public string Error
+        {
+            get => _error;
+            set => SetProperty(ref _error, value);
+        }
+
 
         public Guid ID => Device.Id;
         public string Name => Device.Name;
@@ -166,30 +173,67 @@ namespace BLETest
         public Command StartTestCommand { get; set; }
         public Command DisconnectCommand { get; set; }
 
-        public string Error
-        {
-            get => _error;
-            set => SetProperty(ref _error, value);
-        }
-
         public async Task TestAsync()
         {
             if (Interlocked.CompareExchange(ref _isTestRunning, 1, 0) == 1)
                 return;
 
+            _tokenSource = new CancellationTokenSource(20000);
+
+            var tcs = new TaskCompletionSource<bool>();
+
             try
             {
+                _tokenSource.Token.Register(() => tcs.TrySetCanceled());
+
+                Analytics.TrackEvent(
+                    TrackerEvents.TestStarted,
+                    new Dictionary<string, string>
+                    {
+                        {"ID", Device.Id.ToString()},
+                        {"Name", Device.Name}
+                    });
+
                 IsTesting = true;
 
-                await _adapter.ConnectToDeviceAsync(Device).ConfigureAwait(false);
+                var connectionTask = _adapter.ConnectToDeviceAsync(Device);
+                if (await Task.WhenAny(tcs.Task, connectionTask).ConfigureAwait(false) == connectionTask)
+                {
+                    await connectionTask;
+                }
+                else
+                {
+                    connectionTask.SuppressExceptions();
+                    await _adapter.DisconnectDeviceAsync(Device).ConfigureAwait(false);
+                    throw new TestException("Timeout");
+                }
+
                 await Task.Delay(1500).ConfigureAwait(false);
                 foreach (var method in _testMethods)
                 {
-                    await (Task) method.Invoke(null, new object[] {Device, _adapter});
+                    var task = (Task) method.Invoke(null, new object[] {Device, _adapter});
+                    if (await Task.WhenAny(tcs.Task, task).ConfigureAwait(false) == task)
+                    {
+                        await task;
+                    }
+                    else
+                    {
+                        task.SuppressExceptions();
+                        await _adapter.DisconnectDeviceAsync(Device).ConfigureAwait(false);
+                        throw new TestException("Timeout");
+                    }
                 }
 
                 Error = string.Empty;
                 IsTestSuccessful = true;
+
+                Analytics.TrackEvent(
+                    TrackerEvents.TestSuccessful,
+                    new Dictionary<string, string>
+                    {
+                        {"ID", Device.Id.ToString()},
+                        {"Name", Device.Name}
+                    });
             }
             catch (TestException ex1)
             {
@@ -201,6 +245,15 @@ namespace BLETest
             }
             finally
             {
+                tcs.TrySetCanceled();
+                if (Error != string.Empty)
+                    Analytics.TrackEvent(
+                        TrackerEvents.TestError,
+                        new Dictionary<string, string>
+                        {
+                            {"ID", Device.Id.ToString()},
+                            {"Name", Device.Name}
+                        });
                 IsTesting = false;
                 _isTestRunning = 0;
                 try
@@ -208,12 +261,14 @@ namespace BLETest
                     await _adapter.DisconnectDeviceAsync(Device);
                 }
                 catch (Exception)
-                { }
+                {
+                }
             }
         }
 
         public async Task DisconnectAsync()
         {
+            _tokenSource.Cancel();
             await _adapter.DisconnectDeviceAsync(Device).ConfigureAwait(false);
         }
 
@@ -224,6 +279,13 @@ namespace BLETest
         }
 
         public Stopwatch DiscoveryTimer { get; set; }
+    }
+
+    public static class TrackerEvents
+    {
+        public static string TestError = "TestError";
+        public static string TestSuccessful = "TestSuccessful";
+        public static string TestStarted = "TestStarted";
     }
 
     public interface IDeviceInTest

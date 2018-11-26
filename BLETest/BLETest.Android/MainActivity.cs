@@ -6,6 +6,9 @@ using Android.Content.PM;
 using Android.OS;
 using Android.Support.V4.App;
 using Android.Support.V4.Content;
+using Microsoft.AppCenter;
+using Microsoft.AppCenter.Analytics;
+using Microsoft.AppCenter.Crashes;
 using standard_lib;
 using Xamarin.Forms;
 using Xamarin.Forms.Platform.Android;
@@ -46,6 +49,8 @@ namespace BLETest.Droid
             base.OnCreate(bundle);
 
             Permissions.SetInstance(this);
+
+            AppCenter.Start("bc3f2ae7-f40f-448e-91aa-88c0c6df8fd9", typeof(Analytics), typeof(Crashes));
 
             Forms.Init(this, bundle);
             LoadApplication(new App());

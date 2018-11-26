@@ -1,4 +1,7 @@
 ﻿using Foundation;
+using Microsoft.AppCenter;
+using Microsoft.AppCenter.Analytics;
+using Microsoft.AppCenter.Crashes;
 using UIKit;
 using Xamarin.Forms;
 using Xamarin.Forms.Platform.iOS;
@@ -20,6 +23,8 @@ namespace BLETest.iOS
         //
         public override bool FinishedLaunching(UIApplication app, NSDictionary options)
         {
+            AppCenter.Start("16e5bfaa-1a76-4d29-ae2f-5d835c468efe", typeof(Analytics), typeof(Crashes));
+
             Forms.Init();
             LoadApplication(new App());
 
