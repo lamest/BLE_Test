@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -252,7 +252,8 @@ namespace BLETest
                         new Dictionary<string, string>
                         {
                             {"ID", Device.Id.ToString()},
-                            {"Name", Device.Name}
+                            {"Name", Device.Name == string.Empty ? "none" : Device.Name},
+                            {"Error", Error}
                         });
                 IsTesting = false;
                 _isTestRunning = 0;
