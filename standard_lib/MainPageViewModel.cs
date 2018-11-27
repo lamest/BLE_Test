@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -178,7 +178,7 @@ namespace BLETest
             if (Interlocked.CompareExchange(ref _isTestRunning, 1, 0) == 1)
                 return;
 
-            _tokenSource = new CancellationTokenSource(20000);
+            _tokenSource = new CancellationTokenSource(30000);
 
             var tcs = new TaskCompletionSource<bool>();
 
